@@ -1,0 +1,8 @@
+{
+    "python.analysis.extraPaths": [
+        "./src"
+    ],
+    "micropico.syncFolder": "./src",
+    "micropico.openOnStart": true,
+    "micropico.autoConnect": true
+}
