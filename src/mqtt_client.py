@@ -1,13 +1,12 @@
 import time
 from machine import Pin
+import ssl
 
-# try importing mqtt client
 try:
     from umqtt.robust import MQTTClient
-    print("✅ Imported umqtt.robust")
+    print("Imported umqtt.robust")
 except ImportError:
     try:
-        # from lib folder
         import sys
         sys.path.append('/lib')
         from umqtt.robust import MQTTClient
@@ -17,21 +16,19 @@ except ImportError:
         print("Install: import mip; mip.install('umqtt.robust')")
         MQTTClient = None
 
-
 class MQTTManager:
+    # initialize MQTT manager
     def __init__(self, broker, port, username, password, client_id):
-        # initialize mqtt client
-        # take details from config.py
         self.broker = broker
         self.port = port
         self.username = username
         self.password = password
         self.client_id = client_id
         
-        # status LED
-        self.status_led = Pin("LED", Pin.OUT)
+        self.led_manager = None
         
-        # create MQTT client
+        ssl_params = {'server_hostname': broker} if ssl else None
+        
         self.client = MQTTClient(
             client_id=client_id,
             server=broker,
@@ -39,73 +36,61 @@ class MQTTManager:
             user=username,
             password=password,
             ssl=True,
+            ssl_params=ssl_params,
             keepalive=60
         )
         
-        # set callback for incoming messages
         self.client.set_callback(self.on_message)
         
-        # message buffer
         self.last_message = None
         
         print(f"MQTT Manager initialized for {broker}")
     
     def connect(self):
-        # connect to broker
+        # connect to MQTT broker
         try:
             print(f"Connecting to MQTT broker: {self.broker}")
             
-            # blink LED while connecting
-            for _ in range(3):
-                self.status_led.value(1)
-                time.sleep(0.1)
-                self.status_led.value(0)
-                time.sleep(0.1)
+            if self.led_manager:
+                self.led_manager.set_mode("MQTT_CONNECTING")
             
-            # connect
             self.client.connect()
             
-            # fast blink for success connection
-            for _ in range(5):
-                self.status_led.value(1)
-                time.sleep(0.05)
-                self.status_led.value(0)
-                time.sleep(0.05)
+            if self.led_manager:
+                self.led_manager.set_mode("MQTT_CONNECTED", duration_ms=2000)
             
             print("MQTT connected successfully!")
             return True
             
         except Exception as e:
             print(f"MQTT connection failed: {e}")
-            # Slow blink for error
-            for _ in range(10):
-                self.status_led.value(1)
-                time.sleep(0.5)
-                self.status_led.value(0)
-                time.sleep(0.5)
+            
+            if self.led_manager:
+                self.led_manager.set_mode("ERROR", duration_ms=3000)
+            
             return False
     
     def publish(self, topic, message, retain=False):
         # publish message to topic
         try:
-            # convert dict to JSON string
             if isinstance(message, dict):
                 import json
                 message = json.dumps(message)
             
-            # publish
             self.client.publish(topic.encode(), str(message).encode(), retain=retain)
             
-            # quick LED blink on publish
-            self.status_led.value(1)
-            time.sleep(0.05)
-            self.status_led.value(0)
+            if self.led_manager:
+                self.led_manager.set_mode("DATA_SENT", duration_ms=300)
             
             print(f"Published to {topic}: {message}")
             return True
             
         except Exception as e:
             print(f"Publish failed: {e}")
+            
+            if self.led_manager:
+                self.led_manager.set_mode("ERROR", duration_ms=1000)
+            
             return False
     
     def subscribe(self, topic):
@@ -119,62 +104,131 @@ class MQTTManager:
             return False
     
     def on_message(self, topic, message):
-        # decode bytes to string
+        # handle incoming messages
         topic = topic.decode() if isinstance(topic, bytes) else topic
         message = message.decode() if isinstance(message, bytes) else message
         
-        print(f"message received: {topic} -> {message}")
+        print(f"Control message received: {topic} -> {message}")
+        
+        if topic.endswith("control"):
+            #print(f"LED Command: {message}")
+            
+            if self.led_manager:
+                if message in ["ALERT", "UNCOMFORTABLE", "COMFORTABLE"]:
+                    self.led_manager.set_mode(message, duration_ms=5000)
+                    print(f"   LED set to: {message} pattern")
+                elif message == "ON":
+                    self.led_manager.solid_on()
+                    print("   LED turned ON")
+                elif message == "OFF":
+                    self.led_manager.solid_off()
+                    print("   LED turned OFF")
+                elif message == "BLINK":
+                    self.led_manager.pulse(3, 0.2)
+                    print("   LED blinking")
+                else:
+                    print(f"   Unknown LED command: {message}")
+            else:
+                print("   Warning: LED Manager not available")
+        
         self.last_message = (topic, message)
         
-        # blink LED twice for received message
-        for _ in range(2):
-            self.status_led.value(1)
-            time.sleep(0.1)
-            self.status_led.value(0)
-            time.sleep(0.1)
+        if self.led_manager:
+            self.led_manager.pulse(2, 0.1)
     
     def check_messages(self):
-        # check for incoming messages
         try:
             self.client.check_msg()
         except Exception as e:
             print(f"Error checking messages: {e}")
+            
+            if self.led_manager:
+                self.led_manager.set_mode("ERROR", duration_ms=500)
     
     def disconnect(self):
-        # disconnect from broker
         try:
             self.client.disconnect()
-            self.status_led.value(0)
+            
+            if self.led_manager:
+                self.led_manager.solid_off()
+            
             print("MQTT disconnected")
         except:
             pass
 
+def test_mqtt_with_led_manager():
+    try:
+        import config
+        from led_manager import LEDManager
+        
+        print("TESTING MQTT WITH LED MANAGER ONLY")
 
-def test_mqtt():
-    # test MQTT connection
+        
+        print("\n1. Initializing LED Manager...")
+        led = LEDManager(config.LED_PIN)
+        led.set_status_patterns(config.LED_STATUS)
+        print("LED Manager ready")
+        
+        print("\n2. Initializing MQTT Manager...")
+        mqtt = MQTTManager(
+            config.MQTT_BROKER,
+            config.MQTT_PORT,
+            config.MQTT_USERNAME,
+            config.MQTT_PASSWORD,
+            config.MQTT_CLIENT_ID + "-test-" + str(time.time_ns())[-6:]
+        )
+        
+        mqtt.led_manager = led
+        print("LED Manager connected to MQTT")
+        
+        if mqtt.connect():
+            mqtt.subscribe(config.TOPIC_CONTROL)
+            
+            print("\n3. Testing publishing with LED feedback...")
+            mqtt.publish(config.TOPIC_TEMPERATURE, "23.5")
+            mqtt.publish(config.TOPIC_PRESSURE, "1013.2")
+            
+            print("\n4. Testing LED control patterns...")
+            
+            print("\n5. Waiting for control messages (30 seconds)...")
+            start = time.time()
+            while time.time() - start < 30:
+                mqtt.check_messages()
+                time.sleep(0.1)
+            
+            mqtt.disconnect()
+            print("\nTest complete!")
+            return True
+        else:
+            print("\nMQTT connection failed")
+            return False
+            
+    except ImportError as e:
+        print(f"Import error: {e}")
+        return False
+    except Exception as e:
+        print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def simple_mqtt_test():
     try:
         import config
         
-        print("\n" + "="*50)
-        print("TESTING MQTT CONNECTION")
-        print("="*50)
+        print("SIMPLE MQTT TEST")
         
         mqtt = MQTTManager(
             config.MQTT_BROKER,
             config.MQTT_PORT,
             config.MQTT_USERNAME,
             config.MQTT_PASSWORD,
-            config.MQTT_CLIENT_ID + "_test"
+            config.MQTT_CLIENT_ID
         )
         
         if mqtt.connect():
-            # subscribe to control topic
-            mqtt.subscribe(config.TOPIC_CONTROL)
-            
-            # publish test messages
             print("\nPublishing test messages...")
             
-            # individual topics
             mqtt.publish(config.TOPIC_TEMPERATURE, "23.5")
             mqtt.publish(config.TOPIC_PRESSURE, "1013.2")
             
@@ -186,19 +240,11 @@ def test_mqtt():
             }
             mqtt.publish(config.TOPIC_ALL_DATA, data)
             
-            # check for messages for 5 seconds
-            print("\nChecking for messages (5 seconds)...")
-            start = time.time()
-            while time.time() - start < 5:
-                mqtt.check_messages()
-                time.sleep(0.1)
-            
-            # cleanup
             mqtt.disconnect()
-            print("\nMQTT test complete!")
+            print("\nSimple test complete!")
             return True
         else:
-            print("\nMQTT test failed")
+            print("\nSimple test failed")
             return False
             
     except ImportError:
@@ -209,4 +255,6 @@ def test_mqtt():
         return False
 
 if __name__ == "__main__":
-    test_mqtt()
+    if not test_mqtt_with_led_manager():
+        print("Falling back to simple test...")
+        simple_mqtt_test()

@@ -19,7 +19,7 @@ class WeatherSensor:
             # test reading
             temp = self.sensor.temperature
             pres = self.sensor.pressure
-            print(f"  Test reading: {temp:.1f}°C, {pres:.1f}hPa")
+            print(f"  Test reading: {temp:.1f}°C, {pres:.1f}Pa")
             
         except Exception as e:
             print(f"Failed to initialize BMP280: {e}")
@@ -129,7 +129,7 @@ def test_bmp280():
         if temp is not None:
             print(f"Reading {i+1}:")
             print(f"  Temperature: {temp} °C")
-            print(f"  Pressure: {pres} hPa")
+            print(f"  Pressure: {pres} Pa")
             print("-" * 20)
         else:
             print(f"Reading {i+1} failed")
@@ -139,6 +139,6 @@ def test_bmp280():
     print("\nBMP280 test complete!")
     return True
 
-# Run test if executed directly
+# run test if executed directly
 if __name__ == "__main__":
     test_bmp280()

@@ -21,29 +21,54 @@ class LEDManager:
     
     def set_mode(self, mode_name, duration_ms=None):
         # validate mode
-        # check if mode exists
-        # if not, log error and return False
-        # if exists, set the LED to blink with the specified pattern
         if mode_name not in self.status_patterns:
-            print(f"LED mode '{mode_name}' not found in patterns")
+            print(f"LED mode '{mode_name}' not found. Available: {list(self.status_patterns.keys())}")
             return False
-        
-        # stop any existing blinking
-        self.stop_blink()
-        
-        # set new mode
-        self.current_mode = mode_name
+    
+        #  hceck if this is an alert/temperature pattern that should override others
+        alert_patterns = ["COMFORTABLE", "UNCOMFORTABLE", "ALERT", "ERROR"]
+        data_patterns = ["DATA_SENT", "SENSOR_READING"]
+    
+        current_is_alert = self.current_mode in alert_patterns
+        new_is_alert = mode_name in alert_patterns
+        current_is_data = self.current_mode in data_patterns
+    
+        # If we're already showing an alert, don't interrupt it with data patterns
+        if current_is_alert and mode_name in data_patterns:
+            #print(f"Keeping alert pattern {self.current_mode}, ignoring {mode_name}")
+            return False
+    
+        # if we have a data pattern showing and get an alert, stop the data pattern
+        if current_is_data and new_is_alert:
+            print(f"Stopping data pattern {self.current_mode} for alert {mode_name}")
+            self.stop_blink()
+    
+        # check if we want extended duration
+        extended = mode_name in alert_patterns
+    
+        # get timing values
         on_time, off_time = self.status_patterns[mode_name]
-        
-        
+    
+        # apply extension for alert patterns
+        if extended:
+            EXTENSION_FACTOR = 5  # 5x longer for alerts
+            on_time = on_time * EXTENSION_FACTOR
+            off_time = off_time * EXTENSION_FACTOR
+            #print(f"Alert pattern {mode_name}: {on_time:.2f}s on, {off_time:.2f}s off")
+        else:
+            pass
+            #print(f"Normal pattern {mode_name}: {on_time:.2f}s on, {off_time:.2f}s off")
+    
+        # alculate timing
         period_ms = int((on_time + off_time) * 1000)
         duty_cycle = on_time / (on_time + off_time)
-        
-        print(f"LED Mode: {mode_name} (on:{on_time}s, off:{off_time}s)")
-        
-        # start blinking
+    
+        # Start blinking
         self.start_blink(period_ms, duty_cycle, duration_ms)
-        
+    
+        # Update current mode
+        self.current_mode = mode_name
+    
         return True
     
     def start_blink(self, period_ms, duty_cycle, duration_ms=None):
