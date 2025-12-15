@@ -3,27 +3,47 @@ TEST CODE FOR YOUR WORKING ML PREDICTOR
 Just tests the ML predictions with MQTT
 """
 
+import ntptime
 import time
 import machine
 from wifi_manager import WiFiManager
 from mqtt_client import MQTTManager
 from sensor_manager import WeatherSensor
 from ml_predictor import MLPredictor  # Your working predictor
+from led_manager import LEDManager  # New LED manager
 
 import config
+
+
 
 def test_ml_predictions():
     print("=" * 60)
     print("TEST: ML PREDICTIONS TO MQTT")
     print("=" * 60)
-    
+    led = LEDManager()
+    led.set_status_patterns(config.LED_PATTERNS)
+
     # 1. Connect to Wi-Fi
     print("\n[1/3] Connecting to Wi-Fi...")
+    led.set_mode("WIFI_CONNECTING")
     wifi = WiFiManager(config.WIFI_SSID, config.WIFI_PASSWORD)
     if not wifi.connect(timeout=config.WIFI_TIMEOUT):
-        print("❌ Wi-Fi failed")
+        print("Wi-Fi failed")
+        led.set_mode("WIFI_ERROR")
         return
     
+    led.set_mode("WIFI_CONNECTED")
+
+    # Synchronize time via NTP
+    try:
+        print("Syncing time via NTP...")
+        ntptime.host = "pool.ntp.org"  # default NTP server
+        ntptime.settime()  # sets Pico RTC
+        print("Time synchronized")
+    except Exception as e:
+        print("NTP sync failed:", e)
+
+
     # 2. Connect to MQTT
     print("[2/3] Connecting to MQTT...")
     mqtt = MQTTManager(
@@ -35,7 +55,7 @@ def test_ml_predictions():
     )
     
     if not mqtt.connect():
-        print("❌ MQTT failed")
+        print("MQTT failed")
         wifi.disconnect()
         return
     
@@ -43,17 +63,17 @@ def test_ml_predictions():
     print("[3/3] Initializing sensor...")
     sensor = WeatherSensor()
     if not sensor.is_connected():
-        print("❌ Sensor not found")
+        print("Sensor not found")
         mqtt.disconnect()
         wifi.disconnect()
         return
     
     # 4. Initialize ML (YOUR WORKING PREDICTOR)
-    print("\n🤖 Initializing YOUR ML predictor...")
+    print("\nInitializing YOUR ML predictor...")
     ml = MLPredictor(reading_interval=config.PUBLISH_INTERVAL)
     
     # Ready
-    print("\n✅ READY!")
+    print("\nREADY!")
     print("Will publish ML predictions to:")
     print("  - weather/predictions/5min")
     print("  - weather/predictions/15min")
@@ -63,26 +83,42 @@ def test_ml_predictions():
     
     # Simple test loop
     reading_count = 0
-    
+    msg_id = 0
+
     try:
         while True:
             # Read sensor
             temp, pres = sensor.read()
             
+            if temp > 25:
+                led.set_mode("ALERT")
+            elif temp < 18:
+                led.set_mode("UNCOMFORTABLE")
+            else:
+                led.set_mode("COMFORTABLE")
+
             if temp is not None:
                 reading_count += 1
                 
                 # Add to ML
                 ml.add_reading(temp)
                 
-                # Publish raw data (optional)
-                mqtt.publish(config.TOPIC_TEMPERATURE, temp)
+                # NEW
+                msg_id += 1
+                payload = {
+                    "id": msg_id,
+                    "temperature": temp,
+                    "timestamp": time.time()
+                }
+
+                mqtt.publish(config.TOPIC_TEMPERATURE, payload)
+                #mqtt.publish(config.TOPIC_TEMPERATURE, temp)
                 mqtt.publish(config.TOPIC_PRESSURE, pres)
                 
                 # Make ML prediction every 30 seconds (or 6 readings at 5s interval)
                 if reading_count % 6 == 0:  # Every 6 readings = 30 seconds
                     print("\n" + "─" * 40)
-                    print(f"📊 ML PREDICTION #{reading_count//6}")
+                    print(f"ML PREDICTION #{reading_count//6}")
                     print("─" * 40)
                     
                     # Create predictions for different timeframes
@@ -109,19 +145,19 @@ def test_ml_predictions():
                         success = mqtt.publish(topic, prediction)
                         
                         if success:
-                            print(f"✅ {timeframe}: {prediction['predicted']}°C")
+                            print(f"{timeframe}: {prediction['predicted']}°C")
                         else:
-                            print(f"❌ Failed to publish {timeframe}")
+                            print(f"Failed to publish {timeframe}")
                     
                     # Show details for 5-minute prediction
-                    print(f"\n📈 Current: {pred_5min['current']}°C")
-                    print(f"🎯 Predicted (5min): {pred_5min['predicted']}°C")
-                    print(f"📊 Trend: {pred_5min['trend']}")
-                    print(f"✅ Confidence: {pred_5min['confidence']*100:.0f}%")
+                    print(f"\nCurrent: {pred_5min['current']}°C")
+                    print(f"Predicted (5min): {pred_5min['predicted']}°C")
+                    print(f"Trend: {pred_5min['trend']}")
+                    print(f"Confidence: {pred_5min['confidence']*100:.0f}%")
                 
                 # Simple status every 10 readings
                 if reading_count % 10 == 0:
-                    print(f"\n📝 Status: {reading_count} readings processed")
+                    print(f"\nStatus: {reading_count} readings processed")
             
             # Check for MQTT messages
             mqtt.check_messages()
@@ -130,14 +166,14 @@ def test_ml_predictions():
             time.sleep(config.PUBLISH_INTERVAL)
             
     except KeyboardInterrupt:
-        print("\n\n🛑 Test stopped by user")
+        print("\n\nTest stopped by user")
     except Exception as e:
-        print(f"\n\n❌ Error: {e}")
+        print(f"\n\nError: {e}")
     finally:
-        print("\n🔌 Cleaning up...")
+        print("\nCleaning up...")
         mqtt.disconnect()
         wifi.disconnect()
-        print("✅ Test complete!")
+        print("Test complete!")
 
 
 # Quick standalone test without Wi-Fi/MQTT
@@ -168,7 +204,7 @@ def quick_ml_test():
             print(f"  Trend: {prediction['trend']}")
             print(f"  Confidence: {prediction['confidence']*100:.0f}%")
     
-    print("\n✅ Quick test complete!")
+    print("\nQuick test complete!")
 
 
 # Run what you need
@@ -176,10 +212,25 @@ if __name__ == "__main__":
     print("Choose test:")
     print("1. Full test with Wi-Fi/MQTT")
     print("2. Quick ML test only")
+    print("3. Evaluation Scenario: Small/Large n° of messages")
     
-    choice = input("Enter 1 or 2: ").strip()
+    choice = input("Enter 1, 2 or 3: ").strip()
     
     if choice == "1":
         test_ml_predictions()
-    else:
+    elif choice == "2":
         quick_ml_test()
+    elif choice == "3":
+        # Ask for scenario type
+        scenario = input("Choose scenario: 1=low load, 2=high load: ").strip()
+        if scenario == "1":
+            config.PUBLISH_INTERVAL = 10  # low load
+            print("Running low-load scenario (1 message every 10s)...")
+        elif scenario == "2":
+            config.PUBLISH_INTERVAL = 1   # high load
+            print("Running high-load scenario (1 message every 1s)...")
+        else:
+            print("Invalid scenario choice, defaulting to low load")
+            config.PUBLISH_INTERVAL = 10
+        
+        test_ml_predictions()

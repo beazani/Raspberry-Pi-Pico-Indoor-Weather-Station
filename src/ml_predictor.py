@@ -1,105 +1,121 @@
 import time
 
 class MLPredictor:
-    # initialize ML predictor
-    
-    def __init__(self, window_size=5, reading_interval=5):
-        # window_size: number of readings to consider for prediction
+    """
+    Lightweight trend-based predictor for temperature data.
+    Designed for MicroPython / Raspberry Pi Pico.
+    """
+
+    def __init__(self, window_size=50, reading_interval=5):
         self.history = []
         self.window_size = window_size
         self.reading_interval = reading_interval
         self.prediction_count = 0
-        
-        print(f"SimpleMLPredictor ready (interval: {reading_interval}s)")
-    
+
+        # EMA smoothing factor (lower = smoother, better for longer windows)
+        self.alpha = 0.2
+
+        print(f"MLPredictor ready (window={window_size}, interval={reading_interval}s)")
+
+    # ---------------------------------------------------------
+    # Data ingestion
+    # ---------------------------------------------------------
     def add_reading(self, temperature):
-        # add new temperature reading
-        # if window becomes too large, remove oldest data value
         self.history.append(round(temperature, 1))
-        
+
         if len(self.history) > self.window_size:
             self.history.pop(0)
-    
+
+    # ---------------------------------------------------------
+    # Internal helpers
+    # ---------------------------------------------------------
+    def _smoothed_rate_c_per_sec(self):
+        """
+        Returns smoothed temperature change rate in °C per second
+        using exponential moving average over per-reading deltas.
+        """
+        n = len(self.history)
+        if n < 3:
+            return 0.0
+
+        # Initial rate estimate
+        rate = (self.history[1] - self.history[0]) / self.reading_interval
+
+        # EMA over deltas
+        for i in range(2, n):
+            delta = (self.history[i] - self.history[i - 1]) / self.reading_interval
+            rate = self.alpha * delta + (1 - self.alpha) * rate
+
+        return rate
+
+    def _change_per_hour(self):
+        """
+        Returns bounded temperature change per hour (°C/hour).
+        """
+        change_per_hour = self._smoothed_rate_c_per_sec() * 3600
+
+        # Physical sanity bounds (indoor environment)
+        return max(-5.0, min(5.0, change_per_hour))
+
+    def _change_per_min(self):
+        change_per_min = self._smoothed_rate_c_per_sec() * 60
+        return max(-1.0, min(1.0, change_per_min))
+
+    # ---------------------------------------------------------
+    # Prediction API
+    # ---------------------------------------------------------
     def predict_next(self, minutes_ahead=5):
         self.prediction_count += 1
-        
-        # if not enough data --> return current reading as prediction
-        if len(self.history) < 2:
-            current = self.history[-1] if self.history else 0
+
+        if not self.history:
             return {
-                'current': current,
-                'predicted': current,
-                'trend': 'no_data',
-                'confidence': 0.1,
-                'prediction_id': self.prediction_count
+                "current": 0,
+                "predicted": 0,
+                "trend": "no_data",
+                "confidence": 0.1,
+                "prediction_id": self.prediction_count
             }
-        
+
         current_temp = self.history[-1]
-        
-        # calculate trend
-        if len(self.history) >= 2:
-            # get last change in temperature
-            temp_change = self.history[-1] - self.history[0]
-            # number of intervals between readings
-            time_span = len(self.history) - 1
-            
-            if time_span > 0:
-                # change per reading
-                change_per_reading = temp_change / time_span
-                
-                # convert to change per second
-                change_per_second = change_per_reading / self.reading_interval
-                
-                # predict: current + (change_per_second * seconds_ahead)
-                seconds_ahead = minutes_ahead * 60
-                predicted_change = change_per_second * seconds_ahead
-                
-                # max 3 C change limnit
-                max_change = 3.0
-                if predicted_change > max_change:
-                    predicted_change = max_change
-                elif predicted_change < -max_change:
-                    predicted_change = -max_change
-                
-                predicted_temp = current_temp + predicted_change
-                
-                # determine trend
-                # if change per reading > 0.01 C, rising; < -0.01 C, falling; else stable
-                if change_per_reading > 0.01:
-                    trend = 'rising'
-                elif change_per_reading < -0.01:
-                    trend = 'falling'
-                else:
-                    trend = 'stable'
-                
-                # calculate confidence as function of data points
-                # max 90% confidence
-                # more data points = higher confidence
-                confidence = min(0.9, len(self.history) / self.window_size * 0.8)
-                
-                # calculate change per hour for display
-                change_per_hour = change_per_second * 3600
-                
-            else:
-                predicted_temp = current_temp
-                trend = 'stable'
-                confidence = 0.5
-                change_per_hour = 0
+
+        # Smoothed rate
+        rate_per_sec = self._smoothed_rate_c_per_sec()
+
+        # Prediction
+        seconds_ahead = minutes_ahead * 60
+        predicted_change = rate_per_sec * seconds_ahead
+
+        # Limit extrapolation swing
+        predicted_change = max(-3.0, min(3.0, predicted_change))
+        predicted_temp = current_temp + predicted_change
+
+        # Clamp to plausible temperature range
+        predicted_temp = max(0.0, min(40.0, predicted_temp))
+
+        # Trend classification
+        if rate_per_sec > 0.0005:        # ≈ +0.1 °C/hour
+            trend = "rising"
+        elif rate_per_sec < -0.0005:     # ≈ -0.1 °C/hour
+            trend = "falling"
         else:
-            predicted_temp = current_temp
-            trend = 'stable'
-            confidence = 0.3
-            change_per_hour = 0
-        
-        predicted_temp = max(0, min(40, predicted_temp))
-        
+            trend = "stable"
+
+        # Confidence estimation
+        data_factor = min(1.0, len(self.history) / self.window_size)
+        stability_factor = 1.0 - min(1.0, abs(self._change_per_hour()) / 5.0)
+
+        confidence = 0.2 + 0.7 * data_factor * stability_factor
+        confidence = round(confidence, 2)
+
         return {
-            'current': current_temp,
-            'predicted': round(predicted_temp, 1),
-            'trend': trend,
-            'confidence': round(confidence, 2),
-            'change_per_hour': round(change_per_hour, 2),
-            'prediction_id': self.prediction_count,
-            'data_points': len(self.history),
-            'timestamp': time.time()
+            "current": round(current_temp, 1),
+            "predicted": round(predicted_temp, 1),
+            "trend": trend,
+            "confidence": confidence,
+            "change_per_sec": round(rate_per_sec, 4),
+            "change_per_min": round(self._change_per_min(), 2),
+            "change_per_hour": round(self._change_per_hour(), 2),
+            "prediction_id": self.prediction_count,
+            "data_points": len(self.history),
+            "timestamp": time.time()
         }

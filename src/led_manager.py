@@ -25,7 +25,7 @@ class LEDManager:
             print(f"LED mode '{mode_name}' not found. Available: {list(self.status_patterns.keys())}")
             return False
     
-        #  hceck if this is an alert/temperature pattern that should override others
+        #  check if this is an alert/temperature pattern that should override others
         alert_patterns = ["COMFORTABLE", "UNCOMFORTABLE", "ALERT", "ERROR"]
         data_patterns = ["DATA_SENT", "SENSOR_READING"]
     
