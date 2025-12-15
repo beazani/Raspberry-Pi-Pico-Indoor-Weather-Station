@@ -33,6 +33,19 @@ LED_STATUS = {
     "ERROR": (0.5, 0.1),
 }
 
+# New LED configuration
+LED_PATTERNS = {
+    # Wi-Fi states
+    "WIFI_CONNECTING": (0.2, 0.2),   # fast blink
+    "WIFI_CONNECTED": (0.05, 1.0),   # heartbeat
+    "WIFI_ERROR": (0.3, 0.3),        # slow blink
+
+    # Alerts (longer duration handled by LEDManager)
+    "COMFORTABLE": (0.05, 0.95),     # calm pulse
+    "UNCOMFORTABLE": (0.15, 0.15),   # noticeable blink
+    "ALERT": (0.05, 0.05),           # rapid blink
+}
+
 # Sensor configuration
 SENSOR_I2C_CHANNEL = 0
 SENSOR_SCL_PIN = 20
