@@ -1,0 +1,7 @@
+influxdb-client
+pandas
+matplotlib
+numpy
+scikit-learn
+flask
+flask_cors
