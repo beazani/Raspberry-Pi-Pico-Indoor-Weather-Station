@@ -11,12 +11,17 @@ from mqtt_client import MQTTManager
 from sensor_manager import WeatherSensor
 from ml_predictor import MLPredictor  # Your working predictor
 from led_manager import LEDManager  # New LED manager
+from comfort_HVAC import ComfortML
+from hvac_led_manager import HVAC_LEDManager
+from user_registry import get_user, register_user
+
 
 import config
 
+SCENARIO_NAME = "undefined"
+TEST_START_TIME = None
 
-
-def test_ml_predictions():
+def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_mode="normal", hvac = False, age=None, sex=None):
     print("=" * 60)
     print("TEST: ML PREDICTIONS TO MQTT")
     print("=" * 60)
@@ -81,13 +86,22 @@ def test_ml_predictions():
     print("\nStarting in 2 seconds...")
     time.sleep(2)
     
+    print(f"Scenario: {scenario_name}")
+    if duration_seconds:
+        print(f"Duration: {duration_seconds} seconds")
     # Simple test loop
     reading_count = 0
     msg_id = 0
 
+    start_time = time.time()
     try:
         while True:
             # Read sensor
+            if duration_seconds  is not None:
+                elapsed = time.time() - start_time
+                if elapsed >= duration_seconds:
+                    print(f"\nScenario '{scenario_name}': Duration of {duration_seconds} seconds reached, ending test.")
+                    break
             temp, pres = sensor.read()
             
             if temp > 25:
@@ -96,6 +110,21 @@ def test_ml_predictions():
                 led.set_mode("UNCOMFORTABLE")
             else:
                 led.set_mode("COMFORTABLE")
+
+            if hvac:
+                hvac_led = HVAC_LEDManager()
+                model = ComfortML()
+
+                print("\nComfort prediction running")
+                
+                label, confidence = model.predict(age, sex, temp)
+
+                if label == 1:
+                    hvac_led.set_mode_hvac("COMFORTABLE")
+                    print(f"{temp}°C → Comfortable (p={confidence:.2f})")
+                else:
+                    hvac_led.set_mode_hvac("UNCOMFORTABLE")
+                    print(f"{temp}°C → Uncomfortable (p={confidence:.2f})")
 
             if temp is not None:
                 reading_count += 1
@@ -108,8 +137,19 @@ def test_ml_predictions():
                 payload = {
                     "id": msg_id,
                     "temperature": temp,
-                    "timestamp": time.time()
+                    "timestamp": time.time(),
+                    "scenario": scenario_name
                 }
+
+                if payload_mode == "large":
+                    pred_5min = ml.predict_next(minutes_ahead=5)
+                    payload["confidence"] = pred_5min["confidence"]
+                    payload["change_per_sec"] = pred_5min["change_per_sec"]
+                    payload["change_per_min"] = pred_5min["change_per_min"]
+                    payload["change_per_hour"] = pred_5min["change_per_hour"]
+                    payload["data_points"] = pred_5min["data_points"]
+                    payload["prediction_id"] = pred_5min["prediction_id"]
+
 
                 mqtt.publish(config.TOPIC_TEMPERATURE, payload)
                 #mqtt.publish(config.TOPIC_TEMPERATURE, temp)
@@ -166,8 +206,14 @@ def test_ml_predictions():
             time.sleep(config.PUBLISH_INTERVAL)
             
     except KeyboardInterrupt:
+        if hvac:
+            hvac_led.set_mode_hvac("OFF")
+        led.solid_off()
         print("\n\nTest stopped by user")
     except Exception as e:
+        if hvac:
+            hvac_led.set_mode_hvac("OFF")
+        led.solid_off()
         print(f"\n\nError: {e}")
     finally:
         print("\nCleaning up...")
@@ -213,24 +259,93 @@ if __name__ == "__main__":
     print("1. Full test with Wi-Fi/MQTT")
     print("2. Quick ML test only")
     print("3. Evaluation Scenario: Small/Large n° of messages")
-    
-    choice = input("Enter 1, 2 or 3: ").strip()
+    print("4. Evaluation Scenario: Small/Large payload")
+    print("5. Thermal Comfort prediction model (Age + Sex + Temperature)")
+
+    choice = input("Enter 1, 2, 3, 4 or 5: ").strip()
     
     if choice == "1":
-        test_ml_predictions()
+        config.PUBLISH_INTERVAL = 5  # normal interval
+        test_ml_predictions(scenario_name="normal")
     elif choice == "2":
         quick_ml_test()
     elif choice == "3":
-        # Ask for scenario type
-        scenario = input("Choose scenario: 1=low load, 2=high load: ").strip()
-        if scenario == "1":
-            config.PUBLISH_INTERVAL = 10  # low load
-            print("Running low-load scenario (1 message every 10s)...")
-        elif scenario == "2":
-            config.PUBLISH_INTERVAL = 1   # high load
-            print("Running high-load scenario (1 message every 1s)...")
+        print("\nSTARTING EVALUATION SCENARIOS - Low/High Number of Messages")
+
+        # LOW N_Messages
+        config.PUBLISH_INTERVAL = 10
+        test_ml_predictions(
+            duration_seconds=5 * 60,
+            scenario_name="low_n_messages"
+        )
+
+        time.sleep(5)  # short pause between scenarios
+
+        # HIGH N_Messages
+        config.PUBLISH_INTERVAL = 2
+        test_ml_predictions(
+            duration_seconds=5 * 60,
+            scenario_name="high_n_messages"
+        )
+
+        time.sleep(5)
+
+        # NORMAL mode
+        print("\nSwitching to normal operation")
+        config.PUBLISH_INTERVAL = 5
+        test_ml_predictions(scenario_name="normal")
+    elif choice == "4":
+        # SAME message rate for fairness
+        config.PUBLISH_INTERVAL = 5
+
+        # SMALL PAYLOAD
+        test_ml_predictions(
+            duration_seconds=5 * 60,
+            scenario_name="small_payload",
+            payload_mode="small"
+        )
+
+        time.sleep(5)
+
+        # LARGE PAYLOAD
+        test_ml_predictions(
+            duration_seconds=5 * 60,
+            scenario_name="large_payload",
+            payload_mode="large"
+        )
+
+        time.sleep(5)
+
+        # NORMAL MODE
+        print("\nSwitching to normal operation")
+        test_ml_predictions(
+            scenario_name="normal",
+            payload_mode="normal"
+        )
+    elif choice == "5":
+        username = input("Enter your username: ").strip().lower()
+        user = get_user(username)
+        if user:
+            print(f"Welcome back, {username}!")
+            age_class = user["age"]
+            sex = user["sex"]
         else:
-            print("Invalid scenario choice, defaulting to low load")
-            config.PUBLISH_INTERVAL = 10
+            print("User not found. Registering new user.")
+            age = int(input("Enter your age: "))
+            if age < 30:
+                age_class = 0
+            elif age < 45:
+                age_class = 1
+            elif age < 60:
+                age_class = 2
+            else:
+                age_class = 3
+            sex_input = input("Enter sex (Male/Female): ").strip().lower()
+            sex = 1 if sex_input == "male" else 0
+
+            register_user(username, age_class, sex)
+            print("User registered successfully.")
         
-        test_ml_predictions()
+        test_ml_predictions(scenario_name="normal", hvac = True, age=age_class, sex=sex)
+    else:
+        print("Invalid choice")
