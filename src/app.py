@@ -6,7 +6,7 @@ import os
 import sys
 
 app = Flask(__name__)
-CORS(app)  # Allow MIT App Inventor to fetch data
+CORS(app)
 
 # InfluxDB Configuration
 INFLUX_URL = "http://localhost:8086"
@@ -15,7 +15,7 @@ BUCKET = "Iot_project"
 
 INFLUX_TOKEN = os.getenv("INFLUX_TOKEN")
 if not INFLUX_TOKEN:
-    print("Missing INFLUX_TOKEN environment variable")
+    print("Missing INFLUX_TOKEN")
     sys.exit(1)
 
 client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=ORG)
@@ -24,25 +24,24 @@ query_api = client.query_api()
 def query_influx(flux_query):
     """Executes a Flux query and returns x (time) and y (values)"""
     tables = query_api.query(flux_query)
-    x_values = []
-    y_values = []
+    xvalues = []
+    yvalues = []
 
     for table in tables:
         for record in table.records:
-            x_values.append(record.get_time().strftime("%H:%M:%S"))
-            # If _value does not exist, skip
+            xvalues.append(record.get_time().strftime("%H:%M:%S"))
             try:
-                y_values.append(record.get_value())
+                yvalues.append(record.get_value())
             except:
-                y_values.append(None)
-    return x_values, y_values
+                yvalues.append(None)
+    return xvalues, yvalues
 
-# Temperature endpoint (raw)
+# Temperature endpoint
 @app.route('/temperature', methods=['GET'])
 def temperature():
     flux_query = f'''
     from(bucket:"{BUCKET}")
-      |> range(start: -6h)
+      |> range(start: -1h)
       |> filter(fn: (r) => r._measurement == "weather" and r._field == "temperature")
     '''
     x, y = query_influx(flux_query)
@@ -60,7 +59,7 @@ def pressure():
     x, y = query_influx(flux_query)
     return jsonify({"x": x, "y": y})
 
-# Air density trend
+# Air density trend endpoint
 @app.route('/air_density', methods=['GET'])
 def air_density():
     R = 287.05  # specific gas constant
@@ -81,7 +80,7 @@ def air_density():
     x, y = query_influx(flux_query)
     return jsonify({"x": x, "y": y})
 
-# Temperature alerts
+# Temperature alerts endpoint
 @app.route('/temperature_alerts', methods=['GET'])
 def temperature_alerts():
     flux_query = f'''
@@ -93,7 +92,7 @@ def temperature_alerts():
     x, y = query_influx(flux_query)
     return jsonify({"x": x, "y": y})
 
-# ML Predictions and current temperature
+# ML Predictions and current temperature endpoint
 @app.route('/ml_predictions', methods=['GET'])
 def ml_predictions():
     flux_query = f'''
@@ -120,7 +119,7 @@ def ml_predictions():
     x, y = query_influx(flux_query)
     return jsonify({"x": x, "y": y})
 
-# Latency
+# Latency endpoint
 @app.route('/latency', methods=['GET'])
 def latency():
     flux_query = f'''
@@ -131,7 +130,7 @@ def latency():
     x, y = query_influx(flux_query)
     return jsonify({"x": x, "y": y})
 
-# Temperature count per minute
+# Temperature count per minute endpoint
 @app.route('/temperature_count', methods=['GET'])
 def temperature_count():
     flux_query = f'''

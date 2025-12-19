@@ -2,6 +2,7 @@ import network
 import time
 
 class WiFiManager:
+    """Manages Wi-Fi connections with optional LED status indication and network information."""
     def __init__(self, ssid, password, led_manager=None):
         # initialize wifi manager
         # ssid: network name
@@ -17,7 +18,7 @@ class WiFiManager:
         print(f"Wi-Fi Manager initialized for: {ssid}")
     
     def connect(self, timeout=20):
-        # connect to wifi network with timeout
+        """Connect to Wi-Fi network with optional timeout and LED feedback."""
         print(f"\nAttempting to connect to: {self.ssid}")
         
         # set LED to connecting pattern if available
@@ -49,10 +50,7 @@ class WiFiManager:
         # connected successfully
         print(f"\nWi-Fi connected!")
         print(f"   IP Address: {self.get_ip()}")
-        # print(f"   Subnet Mask: {self.get_subnet()}")
-        # print(f"   Gateway: {self.get_gateway()}")
-        # print(f"   DNS: {self.get_dns()}")
-        
+    
         # set LED to connected pattern
         if self.led_manager:
             self.led_manager.set_mode("WIFI_CONNECTED", duration_ms=3000)
@@ -61,7 +59,7 @@ class WiFiManager:
         return True
     
     def disconnect(self):
-        # disconnect from wifi
+        """Disconnect from Wi-Fi network and turn off LED."""
         print("Disconnecting from Wi-Fi...")
         
         if self.led_manager:
@@ -72,7 +70,7 @@ class WiFiManager:
         print("Wi-Fi disconnected")
     
     def reconnect(self):
-        # retry connection
+        """Attempt to reconnect to Wi-Fi with retry limit and error indication."""
         self.connection_attempts += 1
         
         if self.connection_attempts > self.max_attempts:
@@ -87,42 +85,42 @@ class WiFiManager:
         return self.connect()
     
     def is_connected(self):
-        # check if connected
+        """Check if currently connected to Wi-Fi."""
         return self.wlan.isconnected()
     
     def get_ip(self):
-        # get assigned IP address
+        """Get assigned IP address."""
         if self.wlan.isconnected():
             return self.wlan.ifconfig()[0]
         return "Not connected"
     
     def get_subnet(self):
-        # get subnet mask
+        """Get subnet mask."""
         if self.wlan.isconnected():
             return self.wlan.ifconfig()[1]
         return "Not connected"
     
     def get_gateway(self):
-        # get gateway IP
+        """Get gateway IP address."""
         if self.wlan.isconnected():
             return self.wlan.ifconfig()[2]
         return "Not connected"
     
     def get_dns(self):
-        # get DNS server
+        """Get DNS server address."""
         if self.wlan.isconnected():
             return self.wlan.ifconfig()[3]
         return "Not connected"
     
     def get_strength(self):
-        # get Wi-Fi signal strength
+        """Get Wi-Fi signal strength in dBm (RSSI)."""
 
         if self.wlan.isconnected():
             return self.wlan.status('rssi')
         return None
     
     def get_strength_percentage(self):
-        # get Wi-Fi signal strength as percentage
+        """Get Wi-Fi signal strength as percentage (0-100)."""
         rssi = self.get_strength()
         if rssi is None:
             return 0
@@ -137,7 +135,7 @@ class WiFiManager:
             return int(((rssi + 100) / 70) * 100)
     
     def get_network_info(self):
-        # get all network information as dictionary
+        """Get all network information as dictionary."""
         return {
             "connected": self.is_connected(),
             "ssid": self.ssid,
@@ -150,9 +148,8 @@ class WiFiManager:
             "attempts": self.connection_attempts
         }
 
-# test function
 def test_wifi():
-    # test Wi-Fi connection (requires config.py)
+    """Test Wi-Fi connection and display network information."""
     print("\n" + "="*50)
     print("Testing Wi-Fi Connection")
     print("="*50)

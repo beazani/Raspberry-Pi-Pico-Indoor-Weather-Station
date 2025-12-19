@@ -2,6 +2,7 @@ import time
 from machine import Pin, Timer
 
 class LEDManager:
+    """Manages single LED blinking patterns for status indication."""
     def __init__(self, led_pin="LED"):
         # Initialize LED on specified pin
         self.led = Pin(led_pin, Pin.OUT)
@@ -16,16 +17,16 @@ class LEDManager:
         print("LED Manager initialized (single LED mode)")
     
     def set_status_patterns(self, patterns):
-        # set assigned blinking patterns
+        """Set the blinking patterns dictionary for different status modes."""
         self.status_patterns = patterns
     
     def set_mode(self, mode_name, duration_ms=None):
-        # validate mode
+        """Set LED mode with pattern priority handling for alerts vs data patterns."""
         if mode_name not in self.status_patterns:
             print(f"LED mode '{mode_name}' not found. Available: {list(self.status_patterns.keys())}")
             return False
     
-        #  check if this is an alert/temperature pattern that should override others
+        # check if this is an alert/temperature pattern that should override others
         alert_patterns = ["COMFORTABLE", "UNCOMFORTABLE", "ALERT", "ERROR"]
         data_patterns = ["DATA_SENT", "SENSOR_READING"]
     
@@ -33,9 +34,8 @@ class LEDManager:
         new_is_alert = mode_name in alert_patterns
         current_is_data = self.current_mode in data_patterns
     
-        # If we're already showing an alert, don't interrupt it with data patterns
+        # if an alert is already shown, don't interrupt with data patterns
         if current_is_alert and mode_name in data_patterns:
-            #print(f"Keeping alert pattern {self.current_mode}, ignoring {mode_name}")
             return False
     
         # if we have a data pattern showing and get an alert, stop the data pattern
@@ -54,12 +54,10 @@ class LEDManager:
             EXTENSION_FACTOR = 5  # 5x longer for alerts
             on_time = on_time * EXTENSION_FACTOR
             off_time = off_time * EXTENSION_FACTOR
-            #print(f"Alert pattern {mode_name}: {on_time:.2f}s on, {off_time:.2f}s off")
         else:
             pass
-            #print(f"Normal pattern {mode_name}: {on_time:.2f}s on, {off_time:.2f}s off")
     
-        # alculate timing
+        # Calculate timing
         period_ms = int((on_time + off_time) * 1000)
         duty_cycle = on_time / (on_time + off_time)
     
@@ -72,7 +70,7 @@ class LEDManager:
         return True
     
     def start_blink(self, period_ms, duty_cycle, duration_ms=None):
-        # start blinking with given parameters
+        """Start blinking with specified period, duty cycle, and optional duration."""
         if self.blink_active:
             self.stop_blink()
         
@@ -94,7 +92,7 @@ class LEDManager:
             )
     
     def _toggle_led(self, on_time_ms):
-        # Toggle LED state
+        """Internal method to toggle LED state during blinking."""
         if self.led_state == 0:
             # turn LED on
             self.led.value(1)
@@ -111,7 +109,7 @@ class LEDManager:
             self.led_state = 0
     
     def stop_blink(self):
-        # stop blinking
+        """Stop blinking and turn LED off."""
         if hasattr(self, 'timer'):
             try:
                 self.timer.deinit()
@@ -124,19 +122,19 @@ class LEDManager:
         self.current_mode = None
     
     def solid_on(self):
-        # turn LED solid on
+        """Turn LED solid on."""
         self.stop_blink()
         self.led.value(1)
         self.current_mode = "SOLID_ON"
     
     def solid_off(self):
-        # turn LED solid off
+        """Turn LED solid off."""
         self.stop_blink()
         self.led.value(0)
         self.current_mode = "SOLID_OFF"
     
     def pulse(self, count=1, pulse_duration=0.1):
-        # pulse the LED a specified number of times
+        """Pulse the LED a specified number of times."""
         self.stop_blink()
         
         for i in range(count):
@@ -149,7 +147,7 @@ class LEDManager:
         self.current_mode = f"PULSE_{count}"
     
     def indicate_error(self, error_code):
-        # indicate error with specific pattern
+        """Indicate error code with blinking pattern (number of blinks per digit)."""
         self.stop_blink()
         
         for digit in str(error_code):
@@ -166,7 +164,7 @@ class LEDManager:
         print(f"LED Error indication: {error_code}")
     
     def get_status(self):
-        # return current LED status
+        """Return current LED status including mode, state, and blinking status."""
         return {
             "mode": self.current_mode,
             "state": "ON" if self.led_state else "OFF",
@@ -175,10 +173,10 @@ class LEDManager:
 
 
 def test_led_manager():
-    # test all LED patterns
+    """Test all LED patterns and functions."""
     print("Testing LED Manager...")
     
-    # Test patterns (simulated)
+    # Test patterns
     test_patterns = {
         "CONNECTING": (0.2, 0.2),
         "CONNECTED": (0.05, 0.95),

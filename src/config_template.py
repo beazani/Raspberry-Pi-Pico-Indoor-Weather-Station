@@ -19,28 +19,13 @@ TOPIC_METRICS = "weather/metrics"
 TOPIC_SECURE = "weather/secure"
 
 # LED configuration
-LED_PIN = "LED"
-LED_STATUS = {
-    "WIFI_CONNECTING": (0.2, 0.2),
-    "WIFI_CONNECTED": (0.05, 0.95),
-    "MQTT_CONNECTING": (0.1, 0.1),
-    "MQTT_CONNECTED": (0.05, 0.45),
-    "SENSOR_READING": (0.02, 0.08),
-    "DATA_SENT": (0.01, 0.04),
-    "COMFORTABLE": (0.5, 0.5),
-    "UNCOMFORTABLE": (0.1, 0.1),
-    "ALERT": (0.05, 0.05),
-    "ERROR": (0.5, 0.1),
-}
-
-# New LED configuration
 LED_PATTERNS = {
     # Wi-Fi states
     "WIFI_CONNECTING": (0.2, 0.2),   # fast blink
     "WIFI_CONNECTED": (0.05, 1.0),   # heartbeat
     "WIFI_ERROR": (0.3, 0.3),        # slow blink
 
-    # Alerts (longer duration handled by LEDManager)
+    # Alerts
     "COMFORTABLE": (0.05, 0.95),     # calm pulse
     "UNCOMFORTABLE": (0.15, 0.15),   # noticeable blink
     "ALERT": (0.05, 0.05),           # rapid blink
@@ -52,12 +37,7 @@ SENSOR_SCL_PIN = 20
 SENSOR_SDA_PIN = 21
 
 # System configuration
-PUBLISH_INTERVAL = 5      # seconds between readings
+PUBLISH_INTERVAL = 5      # Seconds between readings
 ML_UPDATE_INTERVAL = 60   # Seconds between ML status updates
 WIFI_TIMEOUT = 20         # Seconds to wait for Wi-Fi connection
 MQTT_TIMEOUT = 10         # Seconds to wait for MQTT connection
-
-# Evaluation settings
-# EVALUATION_MODE = False
-# TEST_PAYLOAD_SMALL = "test_small"
-# TEST_PAYLOAD_LARGE = "test_large"

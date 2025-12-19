@@ -1,6 +1,7 @@
 from machine import Pin
 
 class HVAC_LEDManager:
+    """Manages LED indicators for HVAC comfort status: green for comfortable, red for uncomfortable."""
     def __init__(self, green_pin=15, red_pin=14):
         self.green = Pin(green_pin, Pin.OUT)
         self.red = Pin(red_pin, Pin.OUT)

@@ -12,28 +12,23 @@ class MLPredictor:
         self.reading_interval = reading_interval
         self.prediction_count = 0
 
-        # EMA smoothing factor (lower = smoother, better for longer windows)
+        # EMA smoothing factor
         self.alpha = 0.2
 
         print(f"MLPredictor ready (window={window_size}, interval={reading_interval}s)")
 
-    # ---------------------------------------------------------
+    
     # Data ingestion
-    # ---------------------------------------------------------
     def add_reading(self, temperature):
+        """Add a temperature reading to the history buffer."""
         self.history.append(round(temperature, 1))
 
         if len(self.history) > self.window_size:
             self.history.pop(0)
 
-    # ---------------------------------------------------------
     # Internal helpers
-    # ---------------------------------------------------------
     def _smoothed_rate_c_per_sec(self):
-        """
-        Returns smoothed temperature change rate in °C per second
-        using exponential moving average over per-reading deltas.
-        """
+        """Returns smoothed temperature change rate in °C per second using exponential moving average over per-reading deltas."""
         n = len(self.history)
         if n < 3:
             return 0.0
@@ -49,22 +44,19 @@ class MLPredictor:
         return rate
 
     def _change_per_hour(self):
-        """
-        Returns bounded temperature change per hour (°C/hour).
-        """
+        """Returns bounded temperature change per hour (°C/hour)."""
         change_per_hour = self._smoothed_rate_c_per_sec() * 3600
-
-        # Physical sanity bounds (indoor environment)
+        # Physical sanity bounds
         return max(-5.0, min(5.0, change_per_hour))
 
     def _change_per_min(self):
+        """Return bounded temperature change per minute (°C/min)."""
         change_per_min = self._smoothed_rate_c_per_sec() * 60
         return max(-1.0, min(1.0, change_per_min))
 
-    # ---------------------------------------------------------
     # Prediction API
-    # ---------------------------------------------------------
     def predict_next(self, minutes_ahead=5):
+        """Generate temperature prediction for specified minutes ahead with trend and confidence."""
         self.prediction_count += 1
 
         if not self.history:
@@ -89,13 +81,13 @@ class MLPredictor:
         predicted_change = max(-3.0, min(3.0, predicted_change))
         predicted_temp = current_temp + predicted_change
 
-        # Clamp to plausible temperature range
+        # Fix to plausible temperature range
         predicted_temp = max(0.0, min(40.0, predicted_temp))
 
         # Trend classification
-        if rate_per_sec > 0.0005:        # ≈ +0.1 °C/hour
+        if rate_per_sec > 0.0005:        # °C/hour
             trend = "rising"
-        elif rate_per_sec < -0.0005:     # ≈ -0.1 °C/hour
+        elif rate_per_sec < -0.0005:     # °C/hour
             trend = "falling"
         else:
             trend = "stable"

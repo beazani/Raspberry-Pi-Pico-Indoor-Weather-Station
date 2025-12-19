@@ -17,7 +17,7 @@ except ImportError:
         MQTTClient = None
 
 class MQTTManager:
-    # initialize MQTT manager
+    """Manages MQTT connections, publishing, and subscribing with optional LED feedback."""
     def __init__(self, broker, port, username, password, client_id):
         self.broker = broker
         self.port = port
@@ -47,7 +47,7 @@ class MQTTManager:
         print(f"MQTT Manager initialized for {broker}")
     
     def connect(self):
-        # connect to MQTT broker
+        """Connect to MQTT broker with LED status indication."""
         try:
             print(f"Connecting to MQTT broker: {self.broker}")
             
@@ -71,7 +71,7 @@ class MQTTManager:
             return False
     
     def publish(self, topic, message, retain=False):
-        # publish message to topic
+        """Publish message to topic with automatic JSON serialization."""
         try:
             if isinstance(message, dict):
                 import json
@@ -94,7 +94,7 @@ class MQTTManager:
             return False
     
     def subscribe(self, topic):
-        # subscribe to topic
+        """Subscribe to MQTT topic for incoming messages."""
         try:
             self.client.subscribe(topic.encode())
             print(f"Subscribed to {topic}")
@@ -104,15 +104,13 @@ class MQTTManager:
             return False
     
     def on_message(self, topic, message):
-        # handle incoming messages
+        """Handle incoming MQTT messages and execute LED commands."""
         topic = topic.decode() if isinstance(topic, bytes) else topic
         message = message.decode() if isinstance(message, bytes) else message
         
         print(f"Control message received: {topic} -> {message}")
         
         if topic.endswith("control"):
-            #print(f"LED Command: {message}")
-            
             if self.led_manager:
                 if message in ["ALERT", "UNCOMFORTABLE", "COMFORTABLE"]:
                     self.led_manager.set_mode(message, duration_ms=5000)
@@ -137,6 +135,7 @@ class MQTTManager:
             self.led_manager.pulse(2, 0.1)
     
     def check_messages(self):
+        """Check for and process incoming MQTT messages."""
         try:
             self.client.check_msg()
         except Exception as e:
@@ -146,6 +145,7 @@ class MQTTManager:
                 self.led_manager.set_mode("ERROR", duration_ms=500)
     
     def disconnect(self):
+        """Disconnect from MQTT broker and turn off LED."""
         try:
             self.client.disconnect()
             
@@ -157,6 +157,7 @@ class MQTTManager:
             pass
 
 def test_mqtt_with_led_manager():
+    """Test MQTT manager with LED feedback and control commands."""
     try:
         import config
         from led_manager import LEDManager
@@ -213,6 +214,7 @@ def test_mqtt_with_led_manager():
         return False
 
 def simple_mqtt_test():
+    """Simple MQTT test without LED integration."""
     try:
         import config
         

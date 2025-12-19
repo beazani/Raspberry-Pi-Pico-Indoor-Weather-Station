@@ -3,6 +3,7 @@ TEST CODE FOR YOUR WORKING ML PREDICTOR
 Just tests the ML predictions with MQTT
 """
 
+from timeit import main
 import ntptime
 import time
 import machine
@@ -21,7 +22,8 @@ import config
 SCENARIO_NAME = "undefined"
 TEST_START_TIME = None
 
-def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_mode="normal", hvac = False, age=None, sex=None):
+def main_exec(duration_seconds=None, scenario_name="normal", payload_mode="normal", hvac = False, age=None, sex=None):
+    """Test ML predictions with Wi-Fi, MQTT, and sensor integration. Publishes temperature readings and predictions."""
     print("=" * 60)
     print("TEST: ML PREDICTIONS TO MQTT")
     print("=" * 60)
@@ -73,7 +75,7 @@ def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_m
         wifi.disconnect()
         return
     
-    # 4. Initialize ML (YOUR WORKING PREDICTOR)
+    # 4. Initialize ML
     print("\nInitializing YOUR ML predictor...")
     ml = MLPredictor(reading_interval=config.PUBLISH_INTERVAL)
     
@@ -132,7 +134,6 @@ def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_m
                 # Add to ML
                 ml.add_reading(temp)
                 
-                # NEW
                 msg_id += 1
                 payload = {
                     "id": msg_id,
@@ -152,11 +153,10 @@ def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_m
 
 
                 mqtt.publish(config.TOPIC_TEMPERATURE, payload)
-                #mqtt.publish(config.TOPIC_TEMPERATURE, temp)
                 mqtt.publish(config.TOPIC_PRESSURE, pres)
                 
                 # Make ML prediction every 30 seconds (or 6 readings at 5s interval)
-                if reading_count % 6 == 0:  # Every 6 readings = 30 seconds
+                if reading_count % 6 == 0:
                     print("\n" + "─" * 40)
                     print(f"ML PREDICTION #{reading_count//6}")
                     print("─" * 40)
@@ -202,7 +202,6 @@ def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_m
             # Check for MQTT messages
             mqtt.check_messages()
             
-            # Wait
             time.sleep(config.PUBLISH_INTERVAL)
             
     except KeyboardInterrupt:
@@ -222,9 +221,8 @@ def test_ml_predictions(duration_seconds=None, scenario_name="normal", payload_m
         print("Test complete!")
 
 
-# Quick standalone test without Wi-Fi/MQTT
 def quick_ml_test():
-    """Test ML predictor alone"""
+    """Test ML predictor standalone without Wi-Fi/MQTT using sample temperature data."""
     print("\n" + "=" * 60)
     print("QUICK ML TEST (No Wi-Fi/MQTT)")
     print("=" * 60)
@@ -253,7 +251,6 @@ def quick_ml_test():
     print("\nQuick test complete!")
 
 
-# Run what you need
 if __name__ == "__main__":
     print("Choose test:")
     print("1. Full test with Wi-Fi/MQTT")
@@ -266,7 +263,7 @@ if __name__ == "__main__":
     
     if choice == "1":
         config.PUBLISH_INTERVAL = 5  # normal interval
-        test_ml_predictions(scenario_name="normal")
+        main_exec(scenario_name="normal")
     elif choice == "2":
         quick_ml_test()
     elif choice == "3":
@@ -274,16 +271,16 @@ if __name__ == "__main__":
 
         # LOW N_Messages
         config.PUBLISH_INTERVAL = 10
-        test_ml_predictions(
+        main_exec(
             duration_seconds=5 * 60,
             scenario_name="low_n_messages"
         )
 
-        time.sleep(5)  # short pause between scenarios
+        time.sleep(5)  # pause between scenarios
 
         # HIGH N_Messages
         config.PUBLISH_INTERVAL = 2
-        test_ml_predictions(
+        main_exec(
             duration_seconds=5 * 60,
             scenario_name="high_n_messages"
         )
@@ -293,13 +290,13 @@ if __name__ == "__main__":
         # NORMAL mode
         print("\nSwitching to normal operation")
         config.PUBLISH_INTERVAL = 5
-        test_ml_predictions(scenario_name="normal")
+        main_exec(scenario_name="normal")
     elif choice == "4":
-        # SAME message rate for fairness
+        # Same message rate in two scenarios for fairness
         config.PUBLISH_INTERVAL = 5
 
-        # SMALL PAYLOAD
-        test_ml_predictions(
+        # SMALL payload
+        main_exec(
             duration_seconds=5 * 60,
             scenario_name="small_payload",
             payload_mode="small"
@@ -307,8 +304,8 @@ if __name__ == "__main__":
 
         time.sleep(5)
 
-        # LARGE PAYLOAD
-        test_ml_predictions(
+        # LARGE payload
+        main_exec(
             duration_seconds=5 * 60,
             scenario_name="large_payload",
             payload_mode="large"
@@ -316,13 +313,14 @@ if __name__ == "__main__":
 
         time.sleep(5)
 
-        # NORMAL MODE
+        # NORMAL mode
         print("\nSwitching to normal operation")
-        test_ml_predictions(
+        main_exec(
             scenario_name="normal",
             payload_mode="normal"
         )
     elif choice == "5":
+        # Username to retrieve sex and age class or to register new user
         username = input("Enter your username: ").strip().lower()
         user = get_user(username)
         if user:
@@ -346,6 +344,6 @@ if __name__ == "__main__":
             register_user(username, age_class, sex)
             print("User registered successfully.")
         
-        test_ml_predictions(scenario_name="normal", hvac = True, age=age_class, sex=sex)
+        main_exec(scenario_name="normal", hvac = True, age=age_class, sex=sex)
     else:
         print("Invalid choice")

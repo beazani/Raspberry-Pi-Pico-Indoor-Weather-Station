@@ -2,6 +2,7 @@ import time
 from machine import I2C, Pin
 
 class WeatherSensor:
+    """BMP280 sensor manager for reading temperature and pressure via I2C."""
     def __init__(self, i2c_channel=0, scl_pin=21, sda_pin=20, address=0x76):
         print("Initializing BMP280 sensor...")
         
@@ -28,8 +29,7 @@ class WeatherSensor:
             self.sensor = None
     
     def read(self):
-        # read sensor values
-        # return tuple: (temp,pres)
+        """Read temperature and pressure from sensor. Returns tuple: (temp, pressure) or (None, None) on error."""
         if not self.connected or self.sensor is None:
             return None, None
         
@@ -48,7 +48,7 @@ class WeatherSensor:
             return None, None
     
     def read_json(self):
-        # read sensor values as JSON/dictionary
+        """Read sensor values as JSON dictionary with timestamp."""
         temp, pres = self.read()
         
         if temp is None:
@@ -62,11 +62,11 @@ class WeatherSensor:
         }
     
     def is_connected(self):
-        # check if sensor is connected
+        """Check if sensor is connected and initialized."""
         return self.connected
     
     def scan_i2c(self):
-        # scan I2C bus for devices
+        """Scan I2C bus for connected devices and detect BMP280."""
         print("Scanning I2C bus...")
         devices = self.i2c.scan()
         
@@ -86,7 +86,7 @@ class WeatherSensor:
         return devices
     
     def get_sensor_info(self):
-        # return sensor information    
+        """Return sensor type, connection status, and chip information."""    
         if not self.connected:
             return {"type": "Unknown", "connected": False}
         
@@ -103,7 +103,7 @@ class WeatherSensor:
 
 
 def test_bmp280():
-    # test the BMP280 sensor
+    """Test BMP280 sensor with multiple readings and I2C bus scanning."""
     print("\n" + "="*50)
     print("Testing BMP280 Sensor (Temperature + Pressure ONLY)")
     print("="*50)
@@ -139,6 +139,6 @@ def test_bmp280():
     print("\nBMP280 test complete!")
     return True
 
-# run test if executed directly
+
 if __name__ == "__main__":
     test_bmp280()

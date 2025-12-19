@@ -19,7 +19,7 @@ df.drop(columns=["Age"], inplace=True)
 X = df[["AgeClass", "Sex", "Temperature"]].values
 y = df["Comfort"].values  # 0 / 1
 
-# Normalize features (IMPORTANT)
+# Normalize features
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
@@ -35,7 +35,7 @@ model.fit(X_train, y_train)
 # Evaluate
 y_prob = model.predict_proba(X_test)[:, 1]
 
-# Apply custom threshold (60%)
+# Custom threshold
 threshold = 0.6
 y_pred = (y_prob >= threshold).astype(int)
 print("Accuracy:", accuracy_score(y_test, y_pred))
@@ -51,8 +51,8 @@ print("\n=== SCALER PARAMETERS ===")
 print("Mean:", scaler.mean_)
 print("Scale:", scaler.scale_)
 
-# Let's assume 'Sex' is encoded as 0=female, 1=male
-sex_encoded = 1  # male
+# 0=female, 1=male
+sex_encoded = 1
 age = 70
 if age < 30:
     age_class = 0

@@ -1,8 +1,9 @@
 import math
 
 class ComfortML:
+    """Predicts thermal comfort (0 or 1) based on age, sex, and temperature using logistic regression."""
     def __init__(self):
-        # ===== COPY FROM TRAINING OUTPUT =====
+        # Training parameters
         self.weights = [0.060531, 0.02913246, -0.2601366 ]   # age, sex, temperature
         self.bias = 0.5626224060032154
 
