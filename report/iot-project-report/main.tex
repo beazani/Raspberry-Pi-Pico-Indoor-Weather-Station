@@ -69,11 +69,11 @@ System status information is conveyed through the onboard LED using variations i
 Within the system, following functionalities were implemented:
 \begin{enumerate}
 \item \textbf{Wireless Connectivity:}
-the Raspberry Pi Pico W is equipped with onboard Wi-Fi, which is leveraged to establish wireless communication with an MQTT broker. In this project, HiveMQ Cloud was employed as the MQTT broker, providing secure, scalable and reliable message delivery. This setup allows real-time transmission of temperature and pressure measurements from the BMP280 sensor, as well as control messages for output devices. 
-The MQTT protocol was selected due to its lightweight nature and suitability for constrained IoT devices, ensuring low-latency and efficient communication across the network.
+the Raspberry Pi Pico W is equipped with onboard Wi-Fi, which is leveraged to establish wireless communication with an MQTT broker. In this project, HiveMQ Cloud was employed as the MQTT broker \cite{HiveMQ}, providing secure, scalable and reliable message delivery. This setup allows real-time transmission of temperature and pressure measurements from the BMP280 sensor, as well as control messages for output devices. 
+The Message Queuing Telemetry Transport (MQTT) protocol was selected due to its lightweight nature and suitability for constrained IoT devices, ensuring low-latency and efficient communication across the network.
 
 \item \textbf{Cloud Integration:}
-collected sensor data and processed metrics are transmitted to a cloud-based data pipeline orchestrated using Node-RED. Node-RED is employed to handle MQTT message ingestion, data parsing and logical routing before storing the processed information in InfluxDB, a time-series database optimized for high-frequency sensor data. This architecture enables persistent storage, efficient querying and structured data management. The stored data is subsequently visualized through Grafana dashboards, providing intuitive insights into environmental conditions and system performance. This integration supports both historical data analysis and near real-time monitoring, while allowing the system to scale seamlessly with additional sensors or nodes.
+collected sensor data and processed metrics are transmitted to a cloud-based data pipeline orchestrated using Node-RED \cite{NodeRED}. Node-RED is employed to handle MQTT message ingestion, data parsing and logical routing before storing the processed information in InfluxDB, a time-series database optimized for high-frequency sensor data \cite{InfluxDB}. This architecture enables persistent storage, efficient querying and structured data management. The stored data is subsequently visualized through Grafana dashboards \cite{Grafana}, providing intuitive insights into environmental conditions and system performance. This integration supports both historical data analysis and near real-time monitoring, while allowing the system to scale seamlessly with additional sensors or nodes.
 
 \item \textbf{Mobile App:} 
 the mobile app retrieves data from an API that interfaces with an InFluxDB database. Through predefined API endpoints, the app accesses this information in a structured JSON format. Once received, the app processes the data from each endpoint and presents it as graphs and interactive components, enhancing visualization and making the information more accessible and easier to interpret.
@@ -168,7 +168,7 @@ This architecture enables a seamless integration of edge computing, wireless com
 \section{Methods \& Tools} \label{methods}
 This section provides a comprehensive description of the implementation details of the weather monitoring system, outlining the hardware, software, libraries and protocols utilized. This section encompasses sensor data acquisition, local processing on the Raspberry Pi Pico W, wireless transmission via MQTT, middleware orchestration using Node-RED and data storage in InfluxDB for subsequent visualization with Grafana, Android mobile app and thermal comfort prediction.
 
-\subsection{Config file and setup}
+\subsection{Config file and setup} \label{config}
 The configuration of the entire architecture was developed through the use of a file containing all the relevant parameters required for the connection of the different platforms and protocols. In particular, the file specifies the Wi-Fi network name and password, the MQTT broker details, the topics to be communicated to the broker, the various LED operating configurations for different scenarios, the configuration of the sensors connected to the Raspberry Pi Pico W and the system settings related to timeouts and execution intervals.
 Subsequently, the steps for executing the entire pipeline were defined, including connecting the hardware, uploading the project to the hardware, running the main file and activating Node-RED, InfluxDB and Grafana.
 
@@ -216,7 +216,7 @@ ALERT & 0.05 & 0.05 & Critical condition requiring attention \\
 \subsection{Wireless connectivity}
 
 Wireless connectivity in the proposed weather monitoring system is achieved through a combination of Wi-Fi networking and the MQTT messaging protocol. This architecture enables reliable, low-latency transmission of sensor data from the Raspberry Pi Pico W to downstream middleware and storage components, while also allowing bidirectional control and feedback.
-Network access is handled by a dedicated \texttt{WiFiManager} class, which encapsulates the functionality provided by the MicroPython \texttt{network} module. The Pico W operates in station mode (\texttt{STA\_IF}) and connects to a predefined wireless access point using WPA2 authentication; the password and name of the Wi-Fi to connect to are specified in the \texttt{config.py} file. The connection process includes timeout handling, reconnection attempts and signal strength monitoring based on the received signal strength indicator.
+Network access is handled by a dedicated \texttt{WiFiManager} class, which encapsulates the functionality provided by the MicroPython \texttt{network} module. The Pico W operates in station mode (\texttt{STA\_IF}) and connects to a predefined wireless access point using WPA2 authentication; the password and name of the Wi-Fi to connect to are specified in the \texttt{config.py} file, explained in section \ref{config}. The connection process includes timeout handling, reconnection attempts and signal strength monitoring based on the received signal strength indicator.
 To improve system observability and user feedback, Wi-Fi connection states are visually indicated through the LED management subsystem. During connection attempts, the LED is set to a fast blinking pattern. Once connected, the Wi-Fi manager exposes network configuration parameters such as IP address, gateway, DNS server and signal quality. These parameters can be queried programmatically and included in diagnostic messages or transmitted upstream if required.
 
 \paragraph{MQTT communication model\\}
@@ -269,12 +269,12 @@ A timer node periodically (every 30 seconds) queries the latest temperature from
     \end{itemize}
 \end{itemize}
 
-The Node-RED flow integrates MQTT inputs with real-time processing, alert generation and storage in InfluxDB. Debug nodes provide visibility into the data at each stage, enabling monitoring of the IoT system.
+The Node-RED flow, shown in figure \ref{fig:node_red}, integrates MQTT inputs with real-time processing, alert generation and storage in InfluxDB. Debug nodes provide visibility into the data at each stage, enabling monitoring of the IoT system.
 
 \begin{figure}[H]
     \centering \includegraphics[width=0.9\textwidth,height=0.4\textheight]{img/nodered_flow.png}
     \caption{Node-RED flow}
-    \label{fig:circle}
+    \label{fig:node_red}
 \end{figure}
 
 \subsubsection{InfluxDB}
@@ -296,13 +296,19 @@ InfluxDB is used as a time-series database to store all sensor measurements. Dat
 \caption{InfluxDB weather measurement fields}
 \end{table}
 
-The stored data will later be queried by Grafana for visualization and by a mobile application for real-time monitoring of data and trends.
+The stored data is then queried by Grafana for visualization and by the mobile application for real-time monitoring of data and trends.
 
 
 \subsection{Grafana and mobile app}
 \subsubsection{Grafana}
 
-An initial organized view of the information collected in InfluxDB was obtained by creating a dashboard in Grafana. Compared to the mobile app, which is explained in detail in section \ref{mob_app}, this dashboard facilitated real-time monitoring of the entire project during the development and testing phases. Grafana also enabled the development of new metrics, such as air density, calculated using a coefficient of $287.05~\mathrm{J\,kg^{-1}\,K^{-1}}$, based on the temperature and pressure values measured by the sensor \cite{patel2025arduino}.
+An initial organized view of the information collected in InfluxDB was obtained by creating a dashboard in Grafana. Compared to the mobile app, which is explained in detail in section \ref{mob_app}, this dashboard facilitated real-time monitoring of the entire project during the development and testing phases. Grafana also enabled the development of new metrics, such as air density, calculated as
+\begin{equation}
+\rho = \frac{p}{R_{\mathrm{air}}\,T},
+\end{equation}
+where \(p\) is the measured air pressure, \(T\) is the absolute temperature and
+\(R_{\mathrm{air}} = 287.05~\mathrm{J\,kg^{-1}\,K^{-1}}\) is the specific gas constant for dry air,
+obtained from the universal gas constant divided by the molar mass of air \cite{patel2025arduino}. 
 
 Figure \ref{fig:grafana} shows part of the dashboard developed, with a comparison between temperature predicted at different times and other metrics. 
 
@@ -330,12 +336,12 @@ To retrieve data from InfluxDB and display it in the developed application, a we
     \draw[->] (api) -- (app);
 \end{tikzpicture}
 \end{center}
-This subsection of the overall architecture focuses on the data flow dedicated to visualization within the application. It describes how sensor data is collected, processed and ultimately presented to the end user. The following components are involved:
+This subsection of the overall architecture focuses on the data flow dedicated to visualization within the application. It describes how sensor data is collected, processed and ultimately presented to the end user. The following components were involved:
 \begin{enumerate}
     \item \textbf{InfluxDB:} serves as the time-series data storage layer, containing all measurements collected from the BMP280 sensor. The sensor transmits data via the Raspberry Pi Pico, which forwards it through a data pipeline involving the HiveMQ MQTT Broker and Node-RED, as described previously. Once ingested into InfluxDB, the data is stored in a structured format and made available for querying by the API.
     \item \textbf{Flask API:} acts as the application layer and middleware interface between the storage and presentation tiers. This RESTful service queries the InfluxDB instance using the Flux query language to retrieve historical and real-time sensor data. The API processes the time-series data and exposes it through standardized JSON endpoints for client consumption. Additionally, it implements token-based authentication mechanisms and supports parameterized queries, allowing flexible retrieval of data over specified time ranges \cite{relan2019building}.
 
-    \item \textbf{Android application:} represents the presentation layer and is developed using the Flutter framework. This cross platform client periodically requests data from the Flask API endpoints, parses the JSON responses and displays the information through a responsive dashboard interface. The interface includes interactive line charts (implemented using the FL Chart library), temperature and environmental data cards and automatic data refresh mechanisms. The application enables users to monitor current sensor readings as well as analyze historical trends through graphical representations of all four measured parameters.
+    \item \textbf{Android application:} represents the presentation layer and is developed using the Flutter framework. This cross platform client periodically requests data from the Flask API endpoints, parses the JSON responses and displays the information through a responsive dashboard interface. The interface includes interactive line charts (implemented using the \texttt{FL Chart} library), temperature and environmental data cards and automatic data refresh mechanisms. The application enables users to monitor current sensor readings as well as analyze historical trends through graphical representations of all four measured parameters.
 
     \begin{figure}[H]
     \centering
@@ -412,12 +418,12 @@ $\geq 60$ & 3 \\
 \caption{Age class definition}
 \end{table}
 
-The final input feature vector is defined as:
+The final input feature vector was defined as:
 \begin{equation}
 \mathbf{x} = [x_1, x_2, x_3] = [\text{AgeClass}, \text{Sex}, \text{Temperature}]
 \end{equation}
 
-\subsubsection{Model Training}
+\subsubsection{Model Training} \label{model_training}
 
 A logistic regression classifier was selected due to its low computational cost, interpretability and suitability for embedded systems \cite{Zheng2024ThermalSensationElderly}. Logistic regression is a statistical and machine-learning method used for binary classification. It models the relationship between input features and the probability of an outcome (such as yes/no or 0/1) by applying a sigmoid (logistic) function to a linear combination of the inputs, producing values between 0 and 1 that can be interpreted as probabilities \cite{lavalley2008logistic}. Prior to training, all input features were normalized using standardization:
 \begin{equation}
@@ -639,13 +645,13 @@ These characteristics make the system particularly suitable for indoor environme
 
 \subsection{Observed Weaknesses and Limitations}
 
-Despite the overall positive performance, some limitations can be identified. In the payload size evaluation, a single latency spike exceeding 5000\,ms was observed in the large payload configuration. While this event did not lead to message loss, it suggests that occasional delays may occur when transmitting more complex payloads that include prediction-related metadata. Such spikes could be attributed to transient network congestion, processing overhead within Node-RED, or buffering effects in the MQTT broker.
+Despite the overall positive performance, some limitations can be identified. In the payload size evaluation, a single latency spike exceeding $5000ms$ was observed in the large payload configuration. While this event did not lead to message loss, it suggests that occasional delays may occur when transmitting more complex payloads that include prediction-related metadata. Such spikes could be attributed to transient network congestion, processing overhead within Node-RED, or buffering effects in the MQTT broker.
 
 Another limitation of the evaluation lies in the controlled nature of the test environment. The experiments were conducted over relatively short durations and under stable network conditions. As a result, the evaluation does not fully capture the behaviour of the system under more demanding scenarios, such as prolonged operation, unstable wireless connectivity, or a significantly higher number of concurrent sensor nodes. Additionally, the current architecture was tested with a single publisher, which limits the assessment of scalability in multi-device deployments.
 
 In addition to the communication and scalability considerations, limitations can be identified in the thermal comfort prediction model itself. The current model is primarily driven by temperature data, combined with static user attributes such as age and sex. While this approach allows for a simplified and computationally lightweight implementation suitable for edge deployment, it inherently restricts the expressiveness and accuracy of the comfort predictions. Thermal comfort is influenced by a broader set of environmental and personal factors, including relative humidity, air velocity, mean radiant temperature and clothing insulation.
 
-The dataset used for training and validation \cite{ASHRAE_GTC_DBII}, includes many of these variables. However, due to hardware constraints, only a subset of the available features could be leveraged in the current implementation. The absence of additional sensors capable of measuring humidity or airflow, for example, limits the ability of the model to fully exploit the richness of the dataset and to generalize across a wider range of indoor conditions. Consequently, the current thermal comfort model accuracy could be significantly improved through the integration of additional sensing modalities and a more feature-complete input representation.
+The dataset used for training and validation \cite{ASHRAE_GTC_DBII}, includes many of these variables. However, due to hardware constraints, only a subset of the available features could be leveraged in the current implementation. The absence of additional sensors capable of measuring humidity or airflow, for example, limits the ability of the model to fully exploit the richness of the dataset and to generalize across a wider range of indoor conditions. Consequently, the current thermal comfort model accuracy, shown in section \ref{model_training}, could be significantly improved through the integration of additional sensing modalities and a more feature-complete input representation.
 
 \subsection{Summary}
 
